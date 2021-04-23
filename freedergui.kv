@@ -1,0 +1,46 @@
+##:kivy !
+<my_gui>:
+    ip_prop: ip  # Global variable name references the id name
+    port_prop: port  # Global variable email references the id email
+    out_label: out_label  # Global variable email references the id email
+    start_btn: start_btn
+
+    GridLayout:
+        cols:1
+        #size: root.width - 200, root.height -200
+        #pos: 100, 100
+        size: root.width, root.height #grid größe=fenstergröße
+
+        GridLayout:
+            cols:3
+
+            Label:
+                text: "IP: "
+                size: 80,75
+
+            TextInput:
+                multinline:False
+                id: ip
+                text: "192.168.2.255"
+
+            Button:
+                text:"Start"
+                on_press: root.btn()
+                id: start_btn
+
+            Label:
+                text: "Port: "
+                size: 80,75
+                
+
+            TextInput:
+                multiline:False
+                id: port
+                text: "7002"
+
+
+        Label:
+            text:"Please insert IP+Port and Press start"
+            id: out_label
+            font_size: 40
+
