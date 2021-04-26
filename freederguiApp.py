@@ -2,7 +2,6 @@ from kivy.app import App
 from kivy.core import text
 
 from kivy.uix.label import Label
-from kivy.uix.gridlayout import GridLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.clock import Clock
@@ -11,37 +10,37 @@ from kivy.uix.widget import Widget
 from kivy.lang import Builder
 # The Properties classes are used when you create an EventDispatcher.
 #from kivy.properties import NumericProperty
-from kivy.properties import ObjectProperty
+from kivy.properties import ObjectProperty # Import is correct, just a BUG in the linter
 from freedprotocolparser import freedprotocolparser
 from kaitaistruct import KaitaiStream, BytesIO
-
 import socket
 
-UDP_IP = "192.168.2.255"
-UDP_PORT = 7002
 BUFFERSIZE = 128  # buffer size is 128 bytes
 
 
 class freedatavalues:
-
-    def __init__(self, device_IP="127.0.0.1", device_port=7001):
+    def __init__(self, device_IP="127.0.0.1", device_port=7000):
         self.ip = device_IP
         self.port = device_port
-        self.buffersize = 256
-        # Zur berechnung der Skalierte werte
+        self.buffersize = BUFFERSIZE
+
+        # Zur berechnung der skalierte werte
         # unscaled = 24bit unsigned int
-        self.focus = 0
+        self.focus = 50
         self.min_focus = 100000
-        self.max_focus = 0
-        self.zoom = 0
+        self.max_focus = 100
+        self.zoom = 50
         self.min_zoom = 100000
-        self.max_zoom = 0
+        self.max_zoom = 100
         print("+++ Neues Objekt erstellt +++")
 
     def start(self):
-        self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.my_socket.bind((self.ip, self.port))
-        print("+++ Socket erstellt +++")
+        try:
+            self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.my_socket.bind((self.ip, self.port))
+            print("+++ Socket erstellt +++")
+        except:
+            print("--- Fehler beim erstellen des Sockets")
 
     def stop(self):
         self.my_socket.close()
@@ -49,10 +48,9 @@ class freedatavalues:
 
     def refresh_data(self):
         try:
-            self.packet_data, self.address = self.my_socket.recvfrom(
-                self.buffersize)
+            self.packet_data, self.address = self.my_socket.recvfrom(self.buffersize)
         except:
-            print("!!!!! Fehler beim Lesen aus dem Socket !!!!!")
+            print("!!! Fehler beim Lesen aus dem Socket !!!")
 
     def get_x_m(self):
         return ((freedprotocolparser(KaitaiStream(BytesIO(self.packet_data))).x_pos.value) / 64000)
@@ -93,13 +91,15 @@ class freedatavalues:
 
     def get_zoom_percent(self):
         try:
-            return round(((self.get_raw_zoom()-self.min_zoom)/(self.max_zoom-self.min_zoom))*100, 0)
+            return "NaN"
+            #return round(((self.get_raw_zoom()-self.min_zoom)/(self.max_zoom-self.min_zoom))*100, 0)
         except:
             return "NaN"
 
     def get_focus_percent(self):
         try:
-            return round(((self.get_raw_focus()-self.min_focus)/(self.max_focus-self.min_focus))*100, 0)
+            return "NaN"
+            #return round(((self.get_raw_focus()-self.min_focus)/(self.max_focus-self.min_focus))*100, 0)
         except:
             return "NaN"
 
@@ -120,13 +120,9 @@ class my_gui(Widget):
         super(my_gui, self).__init__(**kwargs)
         self.is_running = 0
         self.freed_initialized = 0
-
-        Clock.schedule_interval(self.programm_logic, .1)
+        Clock.schedule_interval(self.programm_logic, .1) # check for new Values every 0.1 seconds
 
     def btn(self):
-        #print("Name:", self.ip.text, "email:", self.port.text)
-        #self.ip.text = ""
-        #self.port.text = ""
         self.ip = self.ip_prop.text
         self.port = self.port_prop.text
         print("Target_IP:", self.ip, "Target_Port:", self.port)
@@ -145,17 +141,16 @@ class my_gui(Widget):
             Clock.unschedule(self.programm_logic)
             print("STOP")
             self.start_btn.text = "START"
-            self.out_label.text = "PAUSIERT"
+            self.out_label.text = "System Stopped"
             self.is_running = 0
 
     def programm_logic(self, dt):
         if self.is_running == 1:
             if self.freed_initialized == 0:
-                self.kran = freedatavalues(self.ip, int(self.port))
+                self.kran = freedatavalues(self.ip_prop.text, int(self.port_prop.text))
                 self.kran.start()
                 self.freed_initialized = 1
             self.kran.refresh_data()
-            #self.out_label.text = str(self.kran.get_x_m())+str(self.kran.get_pan())
             self.out_label.text=self.print_formated_values()
         elif self.is_running == 0:
             if self.freed_initialized == 1:
@@ -164,14 +159,8 @@ class my_gui(Widget):
 
     def print_formated_values(self):
         try:
-            """
-            self.datenstring = "X:" + self.kran.get_x_m() + "m Y:"+self.kran.get_y_m() + "m Z:" + self.kran.get_z_m() + "m Pan:" + self.kran.get_pan()+"° Tilt:" + self.kran.get_tilt() + "° Roll:" + \
-                self.kran.get_roll() + "° Zoom:" + self.kran.get_raw_zoom() + "(" + self.kran.get_zoom_percent() + \
-                "%) Focus:" + \
-                self.kran.get_raw_focus() + "(" + self.kran.get_focus_percent() + "%)"
-            """
             self.datenstring="Values from: "+str(self.ip)+" Port: "+str(self.port)+"\n"
-            self.datenstring=self.datenstring+(len(self.datenstring)*"- ")+"\n"
+            self.datenstring=self.datenstring+((len(self.datenstring)-1)*"-")+"\n"
             self.datenstring=self.datenstring+"X: "+(f"{self.kran.get_x_m():5.3f}")
             self.datenstring=self.datenstring+"m Y: "+(f"{self.kran.get_y_m():5.3f}")
             self.datenstring=self.datenstring+"m Z: "+(f"{self.kran.get_z_m():5.3f}")
@@ -180,21 +169,27 @@ class my_gui(Widget):
             self.datenstring=self.datenstring+"°  T: "+(f"{self.kran.get_tilt():5.3f}")
             self.datenstring=self.datenstring+"°  R: "+(f"{self.kran.get_roll():5.3f}")
             self.datenstring=self.datenstring+"°\n"
-            self.datenstring=self.datenstring+"Zoom: "+str(self.kran.get_raw_zoom())+"(" + str(self.kran.get_zoom_percent())+"%) Focus: "+str(self.kran.get_raw_focus()) + "(" + str(self.kran.get_focus_percent()) + "%)"
-
+            self.datenstring=self.datenstring+"Zoom: "+str(self.kran.get_raw_zoom())+"(" + str(self.kran.get_zoom_percent())+"%) Focus: "
+            self.datenstring=self.datenstring+str(self.kran.get_raw_focus()) + "(" + str(self.kran.get_focus_percent()) + "%)"
         except:
-            self.datenstring = "Noch keine Daten ehalten"
-        #print(self.datenstring)
+            self.datenstring = "An Error occured. Please check IP and Port Settings"
         return self.datenstring
 
 
 class freederguiApp(App):
-    # Hauptprogramm??
+    # Hauptprogramm
     def build(self):
+        self.title = "Freeder - The Free-D Data Viewer" #Titel des Gui-Fensters
         return my_gui()
+
+    def on_start(self):
+        pass
+    def on_stop(self):
+        # Socket schließen?
+        pass
 
 
 if __name__ == "__main__":
     app = freederguiApp()
-    print("----------- Gui objekt erzeugt")
+    print("+++ Gui Objekt erzeugt")
     app.run()
